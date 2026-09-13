@@ -1,0 +1,18 @@
+# Genererad data (byggs av prepare_data() i pipelinen)
+PROCESSED_DATA/
+
+# Hemligheter - får ALDRIG committas
+*.json
+!package.json
+email_config.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Cache/state-filer
+.cache/
+
+# macOS
+.DS_Store
