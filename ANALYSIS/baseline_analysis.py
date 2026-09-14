@@ -6,9 +6,10 @@ baseline_analysis.py
    (odds bins, crowd % bins, rank features, aggregate odds/crowd products).
 3. Derives historical filter thresholds via a data-driven hill-climbing
    search: starting from [min, max] per feature (100% historical retention),
-   repeatedly tightens whichever feature's bound eliminates the most
-   combinations while keeping combined historical retention above a target
-   threshold (default 80%).
+   repeatedly tightens whichever feature's bound results in the highest
+   remaining historical retention (ties broken by highest elimination),
+   until no more tightening is possible without dropping combined
+   historical retention below a target threshold (default 90%).
 4. Filters a new gameweek's combinations using those thresholds.
 """
 
@@ -98,8 +99,6 @@ def parse_kupong(raw_input):
     return pd.DataFrame(rows)
 
 
-
-
 def kupong_csv_to_baseline(df):
     """
     Converts one historical kupong CSV (13 rows, one per match) into the same
@@ -115,8 +114,6 @@ def kupong_csv_to_baseline(df):
     norm = inv.div(inv.sum(axis=1), axis=0)
     df["imp1"], df["impx"], df["imp2"] = norm["oddset1"], norm["oddsetx"], norm["oddset2"]
     return df[["match_nr", "sv1", "svx", "sv2", "oddset1", "oddsetx", "oddset2", "imp1", "impx", "imp2"]]
-
-
 
 
 def _build_position_lookups(baseline_df):
@@ -137,8 +134,6 @@ def _build_position_lookups(baseline_df):
         draw_clearfav_flag[m] = max_prob >= 0.50
 
     return odds_lookup, svf_lookup, draw_tight_flag, draw_clearfav_flag
-
-
 
 
 def compute_features_vectorized(combos_df, baseline_df):
@@ -231,8 +226,6 @@ def compute_features_vectorized(combos_df, baseline_df):
     return pd.DataFrame(features)
 
 
-
-
 def build_historical_feature_matrix(kupong_dir):
     """
     For every historical round CSV in kupong_dir, builds that round's own
@@ -307,10 +300,12 @@ def _optimize_all_features(historical_features, combo_features, target_retention
     """
     Unified hill-climbing search over ALL features (integer + aggregate) in
     one loop. At each iteration, every feature proposes its smallest
-    possible tightening move (both lower and upper side); moves that would
-    drop combined historical retention below target_retention are
-    discarded; the surviving move that eliminates the most combinations is
-    applied. Repeats until no valid move remains.
+    possible tightening move (both lower and upper side). Among candidate
+    moves that keep combined historical retention >= target_retention, the
+    move that results in the HIGHEST retention is preferred (i.e. the
+    cheapest available improvement is always taken first); ties in
+    resulting retention are broken by picking the move that eliminates the
+    most combinations. Repeats until no valid move remains.
     """
     all_features = INTEGER_FEATURES + AGGREGATE_FEATURES
     thresholds = _init_thresholds(historical_features, all_features)
@@ -319,6 +314,7 @@ def _optimize_all_features(historical_features, combo_features, target_retention
     while True:
         iteration += 1
         best_move = None
+        best_retention = -1
         best_eliminated = -1
 
         for f in all_features:
@@ -334,11 +330,21 @@ def _optimize_all_features(historical_features, combo_features, target_retention
                 trial[f] = (new_val, hi) if side == "lower" else (lo, new_val)
 
                 retention = _compute_retention(historical_features, trial)
-                if retention >= target_retention:
-                    eliminated = _compute_eliminated(combo_features, trial)
-                    if eliminated > best_eliminated:
-                        best_eliminated = eliminated
-                        best_move = (f, side, new_val)
+                if retention < target_retention:
+                    continue
+
+                eliminated = _compute_eliminated(combo_features, trial)
+
+                # Prefer the cheapest move (highest resulting retention) first;
+                # break ties by picking the move that eliminates the most combos
+                is_better = (
+                    retention > best_retention
+                    or (retention == best_retention and eliminated > best_eliminated)
+                )
+                if is_better:
+                    best_retention = retention
+                    best_eliminated = eliminated
+                    best_move = (f, side, new_val)
 
         if best_move is None:
             print(f"[INFO] Converged after {iteration - 1} moves. No more valid tightening.")
@@ -351,7 +357,7 @@ def _optimize_all_features(historical_features, combo_features, target_retention
     return thresholds
 
 
-def get_historical_intervals(kupong_dir, reference_baseline_df, combo_features, target_retention=0.80):
+def get_historical_intervals(kupong_dir, reference_baseline_df, combo_features, target_retention=0.90):
     """
     Runs the full data-driven interval search:
     1. Builds the historical feature matrix from every past round
@@ -366,7 +372,7 @@ def get_historical_intervals(kupong_dir, reference_baseline_df, combo_features, 
         combo_features: pre-computed features for this week's full set of
             candidate combinations (from compute_features_vectorized)
         target_retention: minimum fraction of historical winning rows that
-            must still satisfy the combined thresholds (default 0.80)
+            must still satisfy the combined thresholds (default 0.90)
 
     Returns:
         dict of {feature_name: (lower, upper)}
