@@ -53,4 +53,48 @@ def check_kupong_in_sheets(game_type="Stryktipset"):
 
     print(f"[INFO] No kupong found for {game_type}.")
     return False, None
-    
+
+
+
+def write_kupong_to_sheets(kupong_raw, game_type="Stryktipset"):
+    """
+    Writes a kupong string to Google Sheets, in a game-type-specific column
+    (e.g. "kupong_raw_stryktipset"). Creates the column if it doesn't exist.
+
+    Args:
+        kupong_raw: kupong string, same format as parse_kupong() expects
+        game_type: which game type's column to write to
+    """
+    creds = Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    gc = gspread.authorize(creds)
+    ws = gc.open_by_key(SHEET_ID).worksheet(TAB_NAME)
+
+    headers = ws.row_values(1)
+    kupong_col_name = f"kupong_raw_{game_type.lower()}"
+    clean_headers = [h for h in headers if h and str(h).strip()]
+
+    if kupong_col_name not in clean_headers:
+        col_to_insert = None
+        for i, header in enumerate(headers):
+            if not header or not str(header).strip():
+                col_to_insert = i + 1
+                ws.update_cell(1, col_to_insert, kupong_col_name)
+                break
+
+        if col_to_insert is None:
+            all_values = ws.get_all_values()
+            num_rows = len(all_values) if all_values else 1
+            new_col = [[kupong_col_name]] + [[""] for _ in range(1, num_rows)]
+            ws.insert_cols(new_col, len(headers) + 1)
+            col_to_insert = len(headers) + 1
+
+        headers = ws.row_values(1)
+        print(f"[INFO] Added/updated column '{kupong_col_name}' in Google Sheets")
+
+    kupong_col_idx = headers.index(kupong_col_name) + 1
+    ws.update_cell(2, kupong_col_idx, kupong_raw)
+
+    print(f"[INFO] Wrote kupong to Google Sheets ({len(kupong_raw)} chars, game_type={game_type})")
