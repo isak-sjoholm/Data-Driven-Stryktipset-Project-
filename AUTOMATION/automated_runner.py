@@ -186,3 +186,41 @@ def compute_payout_rank(unique_rows, baseline_df, min_payout=500.0):
     ranked = ranked.sort_values(by="row_probability", ascending=False).reset_index(drop=True)
 
     return ranked
+
+
+
+
+def compute_distribution_table(ranked_rows, baseline_df, top_n=300):
+    """
+    Computes, for each of the 13 matches, what percentage of the top_n rows
+    picked "1", "X", or "2" - plus each match's home/away team names.
+
+    Args:
+        ranked_rows: DataFrame with columns m1..m13, already sorted best-first
+        baseline_df: DataFrame from parse_kupong() with match_nr, home, away
+        top_n: how many top rows to compute the distribution over
+
+    Returns:
+        DataFrame with columns: match_nr, home, away, pct_1, pct_X, pct_2
+    """
+    top_rows = ranked_rows.head(top_n)
+    team_lookup = {
+        int(row["match_nr"]): (row["home"], row["away"])
+        for _, row in baseline_df.iterrows()
+    }
+
+    results = []
+    for m in range(1, 14):
+        col = top_rows[f"m{m}"].astype(str).str.strip()
+        total = len(col)
+        pct_1 = round(100 * (col == "1").sum() / total) if total > 0 else 0
+        pct_x = round(100 * (col == "X").sum() / total) if total > 0 else 0
+        pct_2 = round(100 * (col == "2").sum() / total) if total > 0 else 0
+
+        home, away = team_lookup.get(m, ("", ""))
+        results.append({
+            "match_nr": m, "home": home, "away": away,
+            "pct_1": pct_1, "pct_X": pct_x, "pct_2": pct_2
+        })
+
+    return pd.DataFrame(results)
