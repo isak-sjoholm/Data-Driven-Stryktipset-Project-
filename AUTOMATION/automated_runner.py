@@ -224,3 +224,68 @@ def compute_distribution_table(ranked_rows, baseline_df, top_n=300):
         })
 
     return pd.DataFrame(results)
+
+
+
+def compute_agreement_with_experts_table(ranked_rows, expert_panel, sheet_df, baseline_df, top_n=300):
+    """
+    Computes, for each expert (plus Svenska Folket), what percentage of
+    their fully expanded rows are found among the top_n ranked rows.
+
+    Args:
+        ranked_rows: DataFrame with columns m1..m13, already sorted best-first
+        expert_panel: DataFrame with columns match_nr, pick, player (long
+            format, one row per expert per match) - used to get player IDs
+        sheet_df: DataFrame from check_experts_ready(), with player_name and
+            game_1..game_13 columns - used to expand each expert's picks
+        baseline_df: DataFrame from parse_kupong() with match_nr, sv1, svx, sv2
+        top_n: how many top rows to check agreement against
+
+    Returns:
+        DataFrame with columns: name, agreement_pct
+    """
+    match_cols = [f"m{i}" for i in range(1, 14)]
+    top_set = set(tuple(row) for row in ranked_rows[match_cols].head(top_n).astype(str).values)
+
+    results = []
+
+    # Per-expert agreement
+    for player_id, (_, expert_row) in enumerate(sheet_df.iterrows(), start=1):
+        rows = [{"match_nr": m, "pick": expert_row[f"game_{m}"], "player": player_id} for m in range(1, 14)]
+        df_expert = pd.DataFrame(rows)
+        expanded = expand_expert_to_rows(df_expert)
+
+        total = len(expanded)
+        if total == 0:
+            results.append({"name": expert_row["player_name"], "agreement_pct": 0})
+            continue
+
+        matches = sum(
+            1 for _, r in expanded.iterrows()
+            if tuple(str(r[c]) for c in match_cols) in top_set
+        )
+        agreement_pct = round(100 * matches / total)
+        results.append({"name": expert_row["player_name"], "agreement_pct": agreement_pct})
+
+    # Svenska Folket agreement: majority pick per match vs. majority in top_n
+    total_matches = 0
+    matches_agree = 0
+    for m in range(1, 14):
+        match_col = f"m{m}"
+        top_picks = ranked_rows[match_col].head(top_n).value_counts()
+        if len(top_picks) == 0:
+            continue
+        majority_pick = top_picks.index[0]
+
+        sv_row = baseline_df[baseline_df["match_nr"] == m].iloc[0]
+        sv_map = {"1": sv_row["sv1"], "X": sv_row["svx"], "2": sv_row["sv2"]}
+        sv_majority = max(sv_map, key=sv_map.get)
+
+        if majority_pick == sv_majority:
+            matches_agree += 1
+        total_matches += 1
+
+    sv_agreement_pct = round(100 * matches_agree / total_matches) if total_matches > 0 else 0
+    results.append({"name": "Svenska Folket", "agreement_pct": sv_agreement_pct})
+
+    return pd.DataFrame(results)
