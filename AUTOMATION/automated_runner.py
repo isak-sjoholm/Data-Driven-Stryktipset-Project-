@@ -289,3 +289,29 @@ def compute_agreement_with_experts_table(ranked_rows, expert_panel, sheet_df, ba
     results.append({"name": "Svenska Folket", "agreement_pct": sv_agreement_pct})
 
     return pd.DataFrame(results)
+
+
+
+def rows_to_txt(ranked_rows, top_n=300, game_type="Stryktipset"):
+    """
+    Converts the top_n ranked rows into the txt format used for the emailed
+    attachment: one header line with the game type, then one line per row
+    in the format "E,1,X,2,...".
+
+    Args:
+        ranked_rows: DataFrame with columns m1..m13, already sorted best-first
+        top_n: how many top rows to include
+        game_type: written as the header line
+
+    Returns:
+        str: the full txt content
+    """
+    match_cols = [f"m{i}" for i in range(1, 14)]
+    top_rows = ranked_rows[match_cols].head(top_n)
+
+    lines = [game_type]
+    for _, row in top_rows.iterrows():
+        outcomes = [str(row[c]).strip() for c in match_cols]
+        lines.append("E," + ",".join(outcomes))
+
+    return "\n".join(lines)
