@@ -110,3 +110,79 @@ def compute_agreement_rank(unique_rows, expert_panel, baseline_df):
     ).reset_index(drop=True)
 
     return ranked
+
+
+
+def compute_expected_payout(row, baseline_df):
+    """
+    Computes expected 13-rätt payout for one row, using:
+        payout = (0.65 * 0.4) / (product of Svenska Folket % across all
+                  13 matches, as fractions)
+    The turnover assumption cancels out algebraically, so it's not a
+    parameter here - see project notes.
+
+    Args:
+        row: a single row with columns m1..m13
+        baseline_df: DataFrame from parse_kupong() with match_nr, sv1, svx, sv2
+
+    Returns:
+        float: expected payout in kr
+    """
+    sv_lookup = {
+        int(r["match_nr"]): {"1": r["sv1"], "X": r["svx"], "2": r["sv2"]}
+        for _, r in baseline_df.iterrows()
+    }
+
+    sv_product = 1.0
+    for m in range(1, 14):
+        pick = str(row[f"m{m}"]).strip()
+        sv_pct = sv_lookup.get(m, {}).get(pick, 1e-6)
+        sv_product *= (sv_pct / 100.0)
+
+    if sv_product <= 0:
+        return 0.0
+
+    return (0.65 * 0.4) / sv_product
+
+
+def compute_payout_rank(unique_rows, baseline_df, min_payout=500.0):
+    """
+    METHOD 2 ranking: drops rows whose expected 13-rätt payout is below
+    min_payout, then ranks the remaining rows by row probability under
+    baseline_df's imp1/impx/imp2 (highest first).
+
+    Args:
+        unique_rows: DataFrame with columns m1..m13, one row per candidate
+        baseline_df: DataFrame from parse_kupong() (or after Bayesian
+            update) with match_nr, sv1, svx, sv2, imp1, impx, imp2
+        min_payout: minimum expected payout (kr) to keep a row
+
+    Returns:
+        DataFrame with unique_rows' columns plus expected_payout and
+        row_probability - sorted best-first (only rows above min_payout)
+    """
+    prob_lookup = {
+        int(row["match_nr"]): {"1": row["imp1"], "X": row["impx"], "2": row["imp2"]}
+        for _, row in baseline_df.iterrows()
+    }
+
+    payouts = []
+    probs = []
+
+    for _, row in unique_rows.iterrows():
+        payouts.append(compute_expected_payout(row, baseline_df))
+
+        row_prob = 1.0
+        for m in range(1, 14):
+            pick = str(row[f"m{m}"]).strip()
+            row_prob *= prob_lookup.get(m, {}).get(pick, 1e-9)
+        probs.append(row_prob)
+
+    ranked = unique_rows.copy()
+    ranked["expected_payout"] = payouts
+    ranked["row_probability"] = probs
+
+    ranked = ranked[ranked["expected_payout"] >= min_payout].reset_index(drop=True)
+    ranked = ranked.sort_values(by="row_probability", ascending=False).reset_index(drop=True)
+
+    return ranked
