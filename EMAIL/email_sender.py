@@ -94,3 +94,133 @@ def _agreement_table_to_html(agreement_table):
             f"</tr>"
         )
     return "<table style='border-collapse:collapse;'>" + "".join(rows_html) + "</table>"
+
+
+
+def build_email_html(
+    game_type,
+    total_combos_before,
+    total_combos_after,
+    expert_counts_after_filter,
+    prior_tables_html,
+    consensus_table_html,
+    odds_implied_table_html,
+    bayesian_table_html,
+    method_sections,
+):
+    """
+    Assembles the full HTML email body.
+
+    Args:
+        game_type: e.g. "Stryktipset"
+        total_combos_before: int, combos before historical filtering (~1.6M)
+        total_combos_after: int, combos after historical filtering
+        expert_counts_after_filter: dict {player_name: count} - how many of
+            each expert's expanded rows survived the historical filter
+        prior_tables_html: dict {player_name: html_table_string}
+        consensus_table_html: str
+        odds_implied_table_html: str
+        bayesian_table_html: str
+        method_sections: list of dicts, each with:
+            {"title": str, "stats_html": str (optional), "distribution_html": str,
+             "agreement_html": str, "row_count": int}
+
+    Returns:
+        str: full HTML document
+    """
+    parts = [
+        "<html><head><style>",
+        "body { font-family: Arial, sans-serif; }",
+        "h2 { color: #333; }",
+        "h3 { color: #555; margin-top: 30px; border-bottom: 2px solid #ddd; padding-bottom: 5px; }",
+        "h4 { color: #666; margin-top: 20px; }",
+        "p { color: #444; }",
+        "</style></head><body>",
+        f"<h2>{game_type} - Resultat</h2>",
+        f"<p>Genererat: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>",
+        "<hr>",
+
+        "<h3>Första filtrering</h3>",
+        f"<p>Startade med ca {total_combos_before:,} enkelrader.</p>",
+        f"<p>Efter historisk filtrering fanns {total_combos_after:,} enkelrader kvar.</p>",
+        "<p>Bland dessa fanns:</p>",
+        "<ul>" + "".join(
+            f"<li>{count:,} av {name}s expanderade rader kvar</li>"
+            for name, count in expert_counts_after_filter.items()
+        ) + "</ul>",
+
+        "<h3>Räkna ut sannolikheter</h3>",
+    ]
+
+    for name, table_html in prior_tables_html.items():
+        parts.append(f"<h4>{name}s prior</h4>")
+        parts.append(table_html)
+
+    parts.append("<h4>Konsensus-prior</h4>")
+    parts.append(consensus_table_html)
+    parts.append("<h4>Odds-implied sannolikheter</h4>")
+    parts.append(odds_implied_table_html)
+    parts.append("<h4>Bayesian-uppdaterade sannolikheter</h4>")
+    parts.append(bayesian_table_html)
+
+    for section in method_sections:
+        parts.append(f"<h3>{section['title']}</h3>")
+        if section.get("stats_html"):
+            parts.append(section["stats_html"])
+        parts.append(f"<p>{section['row_count']} rader valda.</p>")
+        parts.append("<h4>Fördelning per match</h4>")
+        parts.append(section["distribution_html"])
+        parts.append("<h4>Agreement</h4>")
+        parts.append(section["agreement_html"])
+
+    parts.append("<hr>")
+    parts.append("<p><strong>Txt-filer med enkelrader är bifogade.</strong></p>")
+    parts.append("</body></html>")
+
+    return "\n".join(parts)
+
+
+def send_combined_results_email(recipient_emails, html_body, txt_attachments, subject, config_file=None):
+    """
+    Sends the results email via SMTP.
+
+    Args:
+        recipient_emails: str or list of str
+        html_body: str, full HTML document (from build_email_html())
+        txt_attachments: dict {filename: txt_content_string}
+        subject: email subject line
+        config_file: path to email_config.txt (default: project root)
+
+    Returns:
+        bool: True if sent successfully
+    """
+    config = _read_email_config(config_file)
+
+    if isinstance(recipient_emails, str):
+        recipient_emails = [recipient_emails]
+
+    msg = MIMEMultipart()
+    msg["From"] = config["sender_email"]
+    msg["To"] = ", ".join(recipient_emails)
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(html_body, "html"))
+
+    for filename, content in txt_attachments.items():
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(content.encode("utf-8"))
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+        msg.attach(part)
+
+    try:
+        server = smtplib.SMTP(config["smtp_server"], config["smtp_port"])
+        server.starttls()
+        server.login(config["sender_email"], config["sender_password"])
+        server.send_message(msg, to_addrs=recipient_emails)
+        server.quit()
+        print(f"[INFO] Email sent to {', '.join(recipient_emails)} with {len(txt_attachments)} attachments")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Could not send email: {e}")
+        return False
