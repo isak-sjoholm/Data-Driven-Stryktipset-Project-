@@ -1,0 +1,46 @@
+name: Prepare Pool
+
+on:
+  schedule:
+    - cron: '0 10 * * 6'
+  workflow_dispatch:
+
+jobs:
+  prepare-pool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Prepare processed data
+        run: python -m PREPROCESSING.preprocessing
+
+      - name: Run prepare_pool
+        run: python -m AUTOMATION.prepare_pool
+
+      - name: Clean up secret file
+        if: always()
+        run: rm -f stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Commit and push pool files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PROCESSED_DATA/filled_combinations/filtered_combinations_stryktipset.csv
+          git add PROCESSED_DATA/filled_combinations/pool_meta_stryktipset.json
+          git diff --staged --quiet || git commit -m "Update pre-filtered pool [automated]"
+          git push
