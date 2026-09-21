@@ -363,3 +363,84 @@ def compute_value_rank(unique_rows, baseline_df, min_probability=0.00002):
     ranked = ranked.sort_values(by="expected_value", ascending=False).reset_index(drop=True)
 
     return ranked
+
+
+
+
+
+import numpy as np
+
+def calculate_method_stats(top_rows, baseline_df, n_simulations=100000):
+    """
+    Simulates n_simulations random rounds (drawn from baseline_df's
+    imp1/impx/imp2) and computes:
+    - prob_13: probability that AT LEAST ONE of top_rows gets all 13 right
+    - mean_payout: expected payout, weighted by each row's own P(13 rätt)
+    - min_payout / max_payout: payout range among rows with P(13 rätt) > 0
+
+    Args:
+        top_rows: DataFrame with columns m1..m13 (the rows being evaluated)
+        baseline_df: DataFrame from parse_kupong() (or after Bayesian
+            update) with match_nr, imp1, impx, imp2, sv1, svx, sv2
+
+    Returns:
+        dict with prob_13, mean_payout, min_payout, max_payout
+    """
+    match_cols = [f"m{i}" for i in range(1, 14)]
+    probs_by_match = {
+        int(row["match_nr"]): [row["imp1"], row["impx"], row["imp2"]]
+        for _, row in baseline_df.iterrows()
+    }
+    choices = ["1", "X", "2"]
+
+    # Simulate n_simulations rounds
+    sim_results = np.empty((n_simulations, 13), dtype="<U1")
+    for i, m in enumerate(range(1, 14)):
+        p = probs_by_match[m]
+        sim_results[:, i] = np.random.choice(choices, size=n_simulations, p=p)
+
+    # Compare each row against every simulation
+    predictions = top_rows[match_cols].astype(str).values
+    n_rows = len(predictions)
+
+    # For each row, count how many simulations it matched exactly (13/13)
+    row_win_counts = np.zeros(n_rows, dtype=int)
+    any_win_count = 0
+
+    for sim_idx in range(n_simulations):
+        sim = sim_results[sim_idx]
+        matches = (predictions == sim).all(axis=1)
+        if matches.any():
+            any_win_count += 1
+        row_win_counts += matches.astype(int)
+
+    prob_13 = any_win_count / n_simulations
+    prob_13_per_row = row_win_counts / n_simulations
+
+    # Compute payout per row
+    payouts = np.array([compute_expected_payout(row, baseline_df) for _, row in top_rows.iterrows()])
+
+    # Mean payout: weighted by each row's own P(13 rätt)
+    if prob_13_per_row.sum() > 0:
+        weights = prob_13_per_row / prob_13_per_row.sum()
+        mean_payout = float(np.sum(payouts * weights))
+    else:
+        mean_payout = 0.0
+
+    valid_mask = prob_13_per_row > 0
+    if valid_mask.sum() > 0:
+        min_payout = float(payouts[valid_mask].min())
+        max_payout = float(payouts[valid_mask].max())
+    else:
+        min_payout = float(payouts.min()) if len(payouts) > 0 else 0.0
+        max_payout = float(payouts.max()) if len(payouts) > 0 else 0.0
+
+    return {
+        "prob_13": prob_13,
+        "mean_payout": mean_payout,
+        "min_payout": min_payout,
+        "max_payout": max_payout,
+    }
+
+
+
