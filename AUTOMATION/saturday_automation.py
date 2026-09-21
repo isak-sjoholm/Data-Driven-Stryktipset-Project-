@@ -46,7 +46,12 @@ from EMAIL.email_sender import build_email_html, send_combined_results_email
 TOP_N = 300
 MIN_PAYOUT = 10000.0
 MIN_PROBABILITY = 0.00002
-RECIPIENTS = ["isaksjo04@gmail.com"]  # switch to all three experts once verified
+
+_expert_emails_env = os.environ.get("EXPERT_EMAILS")
+if _expert_emails_env:
+    RECIPIENTS = [e.strip() for e in _expert_emails_env.split(",") if e.strip()]
+else:
+    RECIPIENTS = ["isaksjo04@gmail.com"]  # local testing fallback
 
 
 def run_pipeline(game_type="Stryktipset"):

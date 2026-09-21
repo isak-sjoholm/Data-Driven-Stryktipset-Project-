@@ -83,11 +83,16 @@ def check_and_send_reminder():
             print("[INFO] Sending reminder email...")
             print()
 
-            recipients = [
-                "ludinho14@gmail.com",
-                "fredrik-a@hotmail.com",
-                "isaksjo04@gmail.com"
-            ]
+
+            expert_emails_env = os.environ.get("EXPERT_EMAILS")
+            if expert_emails_env:
+                recipients = [e.strip() for e in expert_emails_env.split(",") if e.strip()]
+            else:
+                recipients = [
+                    "ludinho14@gmail.com",
+                    "fredrik-a@hotmail.com",
+                    "isaksjo04@gmail.com"
+                ]
 
             if os.environ.get("REMINDER_TEST_ONLY") == "1":
                 recipients = ["isaksjo04@gmail.com"]
