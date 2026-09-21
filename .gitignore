@@ -1,9 +1,13 @@
 # Genererad data (byggs av prepare_data() i pipelinen)
-PROCESSED_DATA/
+PROCESSED_DATA/*
+!PROCESSED_DATA/filled_combinations/
+PROCESSED_DATA/filled_combinations/*
+!PROCESSED_DATA/filled_combinations/filtered_combinations_stryktipset.csv
 
 # Hemligheter - får ALDRIG committas
 *.json
 !package.json
+!PROCESSED_DATA/filled_combinations/pool_meta_stryktipset.json
 email_config.txt
 
 # Python

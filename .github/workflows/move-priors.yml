@@ -1,0 +1,32 @@
+name: Move Priors to Historical
+
+on:
+  schedule:
+    - cron: '0 23 * * 5'
+    - cron: '0 8 * * 5'
+  workflow_dispatch:
+
+jobs:
+  move-priors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Run move_priors_to_historical
+        run: python -m AUTOMATION.move_priors_to_historical
+
+      - name: Clean up secret file
+        if: always()
+        run: rm -f stryktipset-priors-automation-27f390beda4d.json

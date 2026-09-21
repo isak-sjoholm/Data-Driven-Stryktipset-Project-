@@ -13,6 +13,7 @@ Usage:
 import os
 import pandas as pd
 from datetime import datetime
+import json
 
 from AUTOMATION.automation_checker import check_experts_ready
 from AUTOMATION.automated_runner import (
@@ -82,22 +83,39 @@ def run_pipeline(game_type="Stryktipset"):
     baseline_updated = apply_bayesian_update(baseline_df, consensus)
     print("[INFO] Bayesian update applied")
 
-    # STEP 4: Load all combos, compute features, run historical threshold search, filter
-    print("\n[STEP 4] Running historical threshold search and filtering...")
-    combos = pd.read_csv(os.path.join(RAW_DIR, f"all_combinations_{game_type.lower()}.csv"), dtype=str, low_memory=False)
-    total_before = len(combos)
-    combo_features = compute_features_vectorized(combos, baseline_updated)
-    thresholds, historical_features = get_historical_intervals(
-        os.path.join(PROCESSED_DIR, f"kuponger_{game_type.lower()}"),
-        baseline_updated,
-        combo_features,
-        target_retention=0.90,
-    )
-    filter_descriptions = describe_applied_filters(thresholds, historical_features)
-    filtered_path = filter_combinations_by_intervals(game_type, baseline_updated, thresholds)
-    pool = pd.read_csv(filtered_path, dtype=str, low_memory=False)
-    total_after = len(pool)
-    print(f"[INFO] Pool after historical filtering: {total_after:,} rows")
+
+    # STEP 4: Load the pre-filtered pool (built earlier by prepare_pool.py), or
+    # build it now if it doesn't exist yet (local testing / fallback)
+    print("\n[STEP 4] Loading pre-filtered pool...")
+    pool_dir = os.path.join(PROCESSED_DIR, "filled_combinations")
+    pool_path = os.path.join(pool_dir, f"filtered_combinations_{game_type.lower()}.csv")
+    meta_path = os.path.join(pool_dir, f"pool_meta_{game_type.lower()}.json")
+
+    if os.path.exists(pool_path) and os.path.exists(meta_path):
+        pool = pd.read_csv(pool_path, dtype=str, low_memory=False)
+        with open(meta_path, "r") as f:
+            pool_meta = json.load(f)
+        total_before = pool_meta["total_before"]
+        filter_descriptions = pool_meta["filter_descriptions"]
+        total_after = len(pool)
+        print(f"[INFO] Loaded pre-built pool: {total_after:,} rows (built earlier by prepare_pool.py)")
+    else:
+        print("[WARN] No pre-built pool found - building it now (this will take a while)...")
+        combos = pd.read_csv(os.path.join(RAW_DIR, f"all_combinations_{game_type.lower()}.csv"), dtype=str, low_memory=False)
+        total_before = len(combos)
+        combo_features = compute_features_vectorized(combos, baseline_updated)
+        thresholds, historical_features = get_historical_intervals(
+            os.path.join(PROCESSED_DIR, f"kuponger_{game_type.lower()}"),
+            baseline_updated,
+            combo_features,
+            target_retention=0.90,
+        )
+        filter_descriptions = describe_applied_filters(thresholds, historical_features)
+        filtered_path = filter_combinations_by_intervals(game_type, baseline_updated, thresholds)
+        pool = pd.read_csv(filtered_path, dtype=str, low_memory=False)
+        total_after = len(pool)
+        print(f"[INFO] Pool after historical filtering: {total_after:,} rows")
+
 
     # STEP 5: Build expert panel + per-expert row counts (before/after historical filter)
     match_cols = [f"m{i}" for i in range(1, 14)]

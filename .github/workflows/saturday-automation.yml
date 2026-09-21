@@ -1,0 +1,42 @@
+name: Saturday Automation
+
+on:
+  schedule:
+    - cron: '0 11 * * 6'
+  workflow_dispatch:
+
+jobs:
+  saturday-automation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Write email config
+        run: echo '${{ secrets.EMAIL_CONFIG }}' > email_config.txt
+
+      - name: Prepare processed data
+        run: python -m PREPROCESSING.preprocessing
+
+      - name: Run saturday_automation
+        env:
+          EXPERT_EMAILS: ${{ secrets.EXPERT_EMAILS }}
+        run: python -m AUTOMATION.saturday_automation
+
+      - name: Clean up secret files
+        if: always()
+        run: rm -f stryktipset-priors-automation-27f390beda4d.json email_config.txt
