@@ -362,3 +362,168 @@ def send_combined_results_email(recipient_emails, html_body, txt_attachments, su
 
 
 
+def send_reminder_email(recipient_emails, config_file=None):
+    """
+    Sends a reminder email asking experts to fill in their Stryktipset
+    coupon, with a link to the Lovable input app.
+
+    Args:
+        recipient_emails: list of str (or single str)
+        config_file: path to email_config.txt (default: project root)
+
+    Returns:
+        bool: True if sent successfully
+    """
+    config = _read_email_config(config_file)
+
+    if isinstance(recipient_emails, str):
+        recipient_emails = [recipient_emails]
+
+    msg = MIMEMultipart()
+    msg["From"] = config["sender_email"]
+    msg["To"] = ", ".join(recipient_emails)
+    msg["Subject"] = f"Påminnelse: Fyll i din Stryktipset-kupong - {datetime.now().strftime('%Y-%m-%d')}"
+
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                line-height: 1.6;
+                color: #2c3e50;
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 40px auto;
+                background-color: #ffffff;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }}
+            .header {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px 20px;
+                text-align: center;
+            }}
+            .header h1 {{
+                margin: 0;
+                font-size: 24px;
+                font-weight: 600;
+            }}
+            .content {{
+                padding: 40px 30px;
+            }}
+            .game-type {{
+                text-align: center;
+                font-size: 20px;
+                font-weight: 600;
+                color: #667eea;
+                margin: 0 0 30px 0;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #e8e8e8;
+            }}
+            .text {{
+                color: #555;
+                font-size: 16px;
+                margin: 20px 0;
+            }}
+            .button-container {{
+                text-align: center;
+                margin: 30px 0;
+            }}
+            .button {{
+                display: inline-block;
+                padding: 14px 32px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 16px;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            }}
+            .reminder {{
+                background-color: #f8f9fa;
+                border-left: 4px solid #667eea;
+                padding: 20px;
+                margin: 30px 0;
+                border-radius: 4px;
+            }}
+            .reminder strong {{
+                color: #667eea;
+                display: block;
+                margin-bottom: 12px;
+                font-size: 15px;
+            }}
+            .reminder ul {{
+                margin: 10px 0 0 0;
+                padding-left: 20px;
+                color: #555;
+            }}
+            .reminder li {{
+                margin: 8px 0;
+            }}
+            .footer {{
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e8e8e8;
+                text-align: center;
+                color: #999;
+                font-size: 12px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>Påminnelse</h1>
+            </div>
+            <div class="content">
+                <div class="game-type">Stryktipset</div>
+
+                <p class="text">Hej!</p>
+                <p class="text">Det är dags att fylla i din Stryktipset-kupong för denna vecka.</p>
+
+                <div class="button-container">
+                    <a href="https://striktips-prior-probes.lovable.app" class="button">
+                        Fyll i din kupong här
+                    </a>
+                </div>
+
+                <div class="reminder">
+                    <strong>Viktigt att komma ihåg:</strong>
+                    <ul>
+                        <li><strong>5 halvgarderingar</strong> (t.ex. 1X, X2, 12)</li>
+                        <li><strong>2 helgardering</strong> (t.ex. 1, X, 2)</li>
+                    </ul>
+                </div>
+
+                <p class="text" style="text-align: center; margin-top: 30px;">Lycka till!</p>
+
+                <div class="footer">
+                    Automatiskt påminnelsemail
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        server = smtplib.SMTP(config["smtp_server"], config["smtp_port"])
+        server.starttls()
+        server.login(config["sender_email"], config["sender_password"])
+        server.send_message(msg, to_addrs=recipient_emails)
+        server.quit()
+        print(f"[INFO] Reminder email sent to {', '.join(recipient_emails)}")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Could not send reminder email: {e}")
+        return False
