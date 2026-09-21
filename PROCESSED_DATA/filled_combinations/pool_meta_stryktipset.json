@@ -1,6 +1,6 @@
 {
   "total_before": 1594323,
-  "total_after": 0,
+  "total_after": 1430537,
   "filter_descriptions": [
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 11 hemmasegrar (1:or)",
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 5 kryss i matcher med en svag favorit (h\u00f6gsta sannolikhet max 40%)",
@@ -19,5 +19,5 @@
     "Tog bort alla rader d\u00e4r radens totala odds (summa) l\u00e5g utanf\u00f6r intervallet 27-68",
     "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (summa) l\u00e5g utanf\u00f6r intervallet 319-723"
   ],
-  "generated_at": "2026-09-21T19:46:20.075342"
+  "generated_at": "2026-09-21T20:16:25.032278"
 }
