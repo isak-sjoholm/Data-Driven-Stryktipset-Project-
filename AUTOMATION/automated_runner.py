@@ -444,3 +444,75 @@ def calculate_method_stats(top_rows, baseline_df, n_simulations=100000):
 
 
 
+def compute_expert_dropout_breakdown(
+    sheet_df,
+    total_expanded_per_expert,
+    after_historical_filter_per_expert,
+    agreement_pct_per_expert,
+    after_secondary_filter_per_expert=None,
+    method_number=1,
+):
+    """
+    Builds the explanatory dropout text per expert, describing why their
+    rows didn't make it into the top-N for a given method.
+
+    Args:
+        sheet_df: DataFrame with player_name column (for expert names/order)
+        total_expanded_per_expert: dict {player_name: total expanded row count}
+        after_historical_filter_per_expert: dict {player_name: count surviving
+            the historical filter}
+        agreement_pct_per_expert: dict {player_name: agreement_pct} - the
+            percentage already shown in the agreement table (rows actually
+            in the top-N)
+        after_secondary_filter_per_expert: dict {player_name: count surviving
+            the method's secondary filter} - required for method 2 and 3,
+            ignored for method 1
+        method_number: 1, 2, or 3 - determines wording
+
+    Returns:
+        dict {player_name: explanation string}
+    """
+    names = list(sheet_df["player_name"].unique())
+    explanations = {}
+
+    for name in names:
+        total = total_expanded_per_expert.get(name, 0)
+        after_hist = after_historical_filter_per_expert.get(name, 0)
+        agreement_pct = agreement_pct_per_expert.get(name, 0)
+
+        if total == 0:
+            explanations[name] = ""
+            continue
+
+        pct_hist_dropped = round(100 * (total - after_hist) / total)
+
+        if method_number == 1:
+            others = [n for n in names if n != name]
+            others_str = " och ".join(others)
+            pct_rank_dropped = 100 - pct_hist_dropped - agreement_pct
+            explanations[name] = (
+                f"{pct_hist_dropped}% av raderna föll bort för att de ansågs helt osannolika att ge 13 rätt. "
+                f"{pct_rank_dropped}% av raderna föll bort för att {others_str} hade helt andra val."
+            )
+
+        elif method_number == 2:
+            after_secondary = after_secondary_filter_per_expert.get(name, 0)
+            pct_secondary_dropped = round(100 * (after_hist - after_secondary) / total) if total > 0 else 0
+            pct_rank_dropped = 100 - pct_hist_dropped - pct_secondary_dropped - agreement_pct
+            explanations[name] = (
+                f"{pct_hist_dropped}% av raderna föll bort för att de ansågs helt osannolika att ge 13 rätt enligt historiska filter. "
+                f"{pct_secondary_dropped}% av raderna föll bort för att de hade gett mindre än 10 000 kr vid 13 rätt. "
+                f"{pct_rank_dropped}% av raderna föll bort för att de inte var bland topp 300 mest sannolika."
+            )
+
+        elif method_number == 3:
+            after_secondary = after_secondary_filter_per_expert.get(name, 0)
+            pct_secondary_dropped = round(100 * (after_hist - after_secondary) / total) if total > 0 else 0
+            pct_rank_dropped = 100 - pct_hist_dropped - pct_secondary_dropped - agreement_pct
+            explanations[name] = (
+                f"{pct_hist_dropped}% av raderna föll bort för att de ansågs helt osannolika att ge 13 rätt enligt historiska filter. "
+                f"{pct_secondary_dropped}% av raderna föll bort för att de hade under 0.002% sannolikhet att vinna. "
+                f"{pct_rank_dropped}% av raderna föll bort för att de inte hade tillräckligt högt spelvärde."
+            )
+
+    return explanations
