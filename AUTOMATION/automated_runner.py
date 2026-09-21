@@ -315,3 +315,51 @@ def rows_to_txt(ranked_rows, top_n=300, game_type="Stryktipset"):
         lines.append("E," + ",".join(outcomes))
 
     return "\n".join(lines)
+
+
+
+
+def compute_value_rank(unique_rows, baseline_df, min_probability=0.00002):
+    """
+    METHOD 3 ranking: drops rows whose probability of 13 rätt is below
+    min_probability, then ranks the remaining rows by expected value:
+        EV = row_probability * (expected_payout + 1)
+    (the "-1" constant from the full formula P13*payout - (1-P13) doesn't
+    affect ranking, so it's dropped here)
+
+    Args:
+        unique_rows: DataFrame with columns m1..m13, one row per candidate
+        baseline_df: DataFrame from parse_kupong() (or after Bayesian
+            update) with match_nr, sv1, svx, sv2, imp1, impx, imp2
+        min_probability: minimum row probability (P13) to keep a row
+
+    Returns:
+        DataFrame with unique_rows' columns plus row_probability,
+        expected_payout, and expected_value - sorted best-first (only rows
+        above min_probability)
+    """
+    prob_lookup = {
+        int(row["match_nr"]): {"1": row["imp1"], "X": row["impx"], "2": row["imp2"]}
+        for _, row in baseline_df.iterrows()
+    }
+
+    probs = []
+    payouts = []
+
+    for _, row in unique_rows.iterrows():
+        row_prob = 1.0
+        for m in range(1, 14):
+            pick = str(row[f"m{m}"]).strip()
+            row_prob *= prob_lookup.get(m, {}).get(pick, 1e-9)
+        probs.append(row_prob)
+        payouts.append(compute_expected_payout(row, baseline_df))
+
+    ranked = unique_rows.copy()
+    ranked["row_probability"] = probs
+    ranked["expected_payout"] = payouts
+    ranked["expected_value"] = ranked["row_probability"] * (ranked["expected_payout"] + 1)
+
+    ranked = ranked[ranked["row_probability"] >= min_probability].reset_index(drop=True)
+    ranked = ranked.sort_values(by="expected_value", ascending=False).reset_index(drop=True)
+
+    return ranked
