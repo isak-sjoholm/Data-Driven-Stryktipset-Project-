@@ -1,0 +1,33 @@
+name: Update Kupong
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-kupong:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Run update_kuponger_scheduler
+        run: python -m AUTOMATION.update_kuponger_scheduler
+
+      - name: Clean up secret file
+        if: always()
+        run: rm -f stryktipset-priors-automation-27f390beda4d.json
