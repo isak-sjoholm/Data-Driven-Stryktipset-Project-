@@ -1,8 +1,10 @@
 """
 email_sender.py
 ---------------
-Builds and sends the results email: one section per ranking method
-(agreement, payout), each with a distribution table, an agreement table,
+Builds and sends the results email: filtering summary, probability
+breakdown (individual priors -> consensus -> odds-implied -> Bayesian
+update), then one section per ranking method (agreement, payout, value)
+with explanatory text, stats, a distribution table, an agreement table,
 and a txt attachment of the top rows.
 """
 
@@ -56,6 +58,48 @@ def _read_email_config(config_file=None):
     return config
 
 
+def _probability_table_to_html(df, prob_cols):
+    """
+    Renders a probability table (per-match 1/X/2 probabilities) as HTML,
+    with columns Match, Hemmalag, Bortalag, 1, X, 2 - probabilities shown
+    as whole-number percentages.
+
+    Args:
+        df: DataFrame with columns match_nr, home, away, plus the three
+            probability columns named in prob_cols
+        prob_cols: tuple of 3 column names in the df, in order (p1, pX, p2)
+
+    Returns:
+        str: HTML table
+    """
+    p1_col, pX_col, p2_col = prob_cols
+    rows_html = []
+    for _, row in df.iterrows():
+        rows_html.append(
+            f"<tr>"
+            f"<td style='padding:6px; border:1px solid #ddd;'>{int(row['match_nr'])}</td>"
+            f"<td style='padding:6px; border:1px solid #ddd;'>{row['home']}</td>"
+            f"<td style='padding:6px; border:1px solid #ddd;'>{row['away']}</td>"
+            f"<td style='padding:6px; border:1px solid #ddd; text-align:center;'>{round(row[p1_col]*100)}%</td>"
+            f"<td style='padding:6px; border:1px solid #ddd; text-align:center;'>{round(row[pX_col]*100)}%</td>"
+            f"<td style='padding:6px; border:1px solid #ddd; text-align:center;'>{round(row[p2_col]*100)}%</td>"
+            f"</tr>"
+        )
+    return (
+        "<table style='border-collapse:collapse; width:100%;'>"
+        "<tr>"
+        "<th style='padding:6px; border:1px solid #ddd;'>Match</th>"
+        "<th style='padding:6px; border:1px solid #ddd;'>Hemmalag</th>"
+        "<th style='padding:6px; border:1px solid #ddd;'>Bortalag</th>"
+        "<th style='padding:6px; border:1px solid #ddd;'>1</th>"
+        "<th style='padding:6px; border:1px solid #ddd;'>X</th>"
+        "<th style='padding:6px; border:1px solid #ddd;'>2</th>"
+        "</tr>"
+        + "".join(rows_html) +
+        "</table>"
+    )
+
+
 def _distribution_table_to_html(dist_table):
     """Converts a compute_distribution_table() DataFrame to an HTML table."""
     rows_html = []
@@ -83,47 +127,81 @@ def _distribution_table_to_html(dist_table):
     )
 
 
-def _agreement_table_to_html(agreement_table):
-    """Converts a compute_agreement_with_experts_table() DataFrame to an HTML table."""
+def _agreement_table_to_html(agreement_table, dropout_explanations=None):
+    """
+    Converts a compute_agreement_with_experts_table() DataFrame to an HTML
+    table, with an optional explanatory line under each expert's row
+    describing why their rows didn't make the top-N (not shown for
+    Svenska Folket, which has no dropout breakdown).
+
+    Args:
+        agreement_table: DataFrame with columns name, agreement_pct
+        dropout_explanations: dict {player_name: explanation string},
+            from compute_expert_dropout_breakdown() - optional
+    """
     rows_html = []
     for _, row in agreement_table.iterrows():
+        name = row["name"]
         rows_html.append(
             f"<tr>"
-            f"<td style='padding:6px; border:1px solid #ddd; font-weight:bold;'>{row['name']}</td>"
+            f"<td style='padding:6px; border:1px solid #ddd; font-weight:bold;'>{name}</td>"
             f"<td style='padding:6px; border:1px solid #ddd; text-align:right;'>{row['agreement_pct']}%</td>"
             f"</tr>"
         )
-    return "<table style='border-collapse:collapse;'>" + "".join(rows_html) + "</table>"
+        if dropout_explanations and name in dropout_explanations and dropout_explanations[name]:
+            rows_html.append(
+                f"<tr>"
+                f"<td colspan='2' style='padding:4px 6px 12px 6px; border-left:1px solid #ddd; border-right:1px solid #ddd; font-size:12px; color:#777; font-style:italic;'>"
+                f"{dropout_explanations[name]}"
+                f"</td>"
+                f"</tr>"
+            )
 
+    return "<table style='border-collapse:collapse; width:100%;'>" + "".join(rows_html) + "</table>"
+
+def _stats_to_html(stats):
+    """Renders the P(13 rätt) / mean payout / payout range stats as an HTML list."""
+    return (
+        "<ul>"
+        f"<li>Sannolikhet för 13 rätt: {stats['prob_13']*100:.3f}%</li>"
+        f"<li>Snitt utdelning vid 13 rätt: {stats['mean_payout']:,.0f} kr</li>"
+        f"<li>Intervall utdelning vid 13 rätt: {stats['min_payout']:,.0f} - {stats['max_payout']:,.0f} kr</li>"
+        "</ul>"
+    )
 
 
 def build_email_html(
     game_type,
     total_combos_before,
+    filter_descriptions,
     total_combos_after,
     expert_counts_after_filter,
-    prior_tables_html,
-    consensus_table_html,
-    odds_implied_table_html,
-    bayesian_table_html,
-    method_sections,
+    prior_tables,
+    consensus_df,
+    odds_implied_df,
+    bayesian_df,
+    method1,
+    method2,
+    method3,
 ):
     """
     Assembles the full HTML email body.
 
     Args:
         game_type: e.g. "Stryktipset"
-        total_combos_before: int, combos before historical filtering (~1.6M)
+        total_combos_before: int, combos before historical filtering
+        filter_descriptions: list of str, from describe_applied_filters()
         total_combos_after: int, combos after historical filtering
-        expert_counts_after_filter: dict {player_name: count} - how many of
-            each expert's expanded rows survived the historical filter
-        prior_tables_html: dict {player_name: html_table_string}
-        consensus_table_html: str
-        odds_implied_table_html: str
-        bayesian_table_html: str
-        method_sections: list of dicts, each with:
-            {"title": str, "stats_html": str (optional), "distribution_html": str,
-             "agreement_html": str, "row_count": int}
+        expert_counts_after_filter: dict {player_name: count}
+        prior_tables: dict {player_name: DataFrame} (match_nr, home, away, p1, pX, p2)
+        consensus_df: DataFrame (match_nr, home, away, prior1, priorX, prior2)
+        odds_implied_df: DataFrame (match_nr, home, away, imp1, impx, imp2)
+        bayesian_df: DataFrame (match_nr, home, away, imp1, impx, imp2)
+        method1: dict with keys: row_count, distribution_df, agreement_df, stats
+        method2: dict with keys: min_payout, remaining_count, row_count,
+            distribution_df, agreement_df, stats
+        method3: dict with keys: min_probability, remaining_count, row_count,
+            distribution_df, agreement_df, stats
 
     Returns:
         str: full HTML document
@@ -141,38 +219,95 @@ def build_email_html(
         "<hr>",
 
         "<h3>Första filtrering</h3>",
-        f"<p>Startade med ca {total_combos_before:,} enkelrader.</p>",
-        f"<p>Efter historisk filtrering fanns {total_combos_after:,} enkelrader kvar.</p>",
+        f"<p>Startade med alla möjliga {total_combos_before:,} enkelrader.</p>",
+        "<ul>" + "".join(f"<li>{desc}</li>" for desc in filter_descriptions) + "</ul>",
+        f"<p>Efter filtreringen fanns {total_combos_after:,} enkelrader kvar.</p>",
         "<p>Bland dessa fanns:</p>",
         "<ul>" + "".join(
-            f"<li>{count:,} av {name}s expanderade rader kvar</li>"
+            f"<li>{count:,} av {name}s enkelrader kvar</li>"
             for name, count in expert_counts_after_filter.items()
         ) + "</ul>",
 
         "<h3>Räkna ut sannolikheter</h3>",
+        "<p>För Isak, Ludde och Fredde räknades deras implied sannolikheter ut för varje match baserat på deras val:</p>",
     ]
 
-    for name, table_html in prior_tables_html.items():
-        parts.append(f"<h4>{name}s prior</h4>")
-        parts.append(table_html)
+    for name, df in prior_tables.items():
+        parts.append(f"<h4>{name}:</h4>")
+        parts.append(_probability_table_to_html(df, ("p1", "pX", "p2")))
 
-    parts.append("<h4>Konsensus-prior</h4>")
-    parts.append(consensus_table_html)
-    parts.append("<h4>Odds-implied sannolikheter</h4>")
-    parts.append(odds_implied_table_html)
-    parts.append("<h4>Bayesian-uppdaterade sannolikheter</h4>")
-    parts.append(bayesian_table_html)
+    parts.append("<p>Sedan kombineras dessa till gemensamma sannolikheter baserat på hur mycket de håller med varandra, vem som är mest säker (spikar), osv:</p>")
+    parts.append("<h4>Gemensamma sannolikheter:</h4>")
+    parts.append(_probability_table_to_html(consensus_df, ("prior1", "priorX", "prior2")))
 
-    for section in method_sections:
-        parts.append(f"<h3>{section['title']}</h3>")
-        if section.get("stats_html"):
-            parts.append(section["stats_html"])
-        parts.append(f"<p>{section['row_count']} rader valda.</p>")
-        parts.append("<h4>Fördelning per match</h4>")
-        parts.append(section["distribution_html"])
-        parts.append("<h4>Agreement</h4>")
-        parts.append(section["agreement_html"])
+    parts.append('<p>Givet matchernas odds räknades dessa "objektiva" sannolikheter ut för varje match:</p>')
+    parts.append("<h4>Sannolikheter enligt oddsmarknaden:</h4>")
+    parts.append(_probability_table_to_html(odds_implied_df, ("imp1", "impx", "imp2")))
 
+    parts.append("<p>Med Isak, Ludde, och Freddes input justerades dessa sannolikheter för varje match till:</p>")
+    parts.append("<h4>Sannolikheter enligt oddsmarknaden + Ludde/Fredde/Isak:</h4>")
+    parts.append(_probability_table_to_html(bayesian_df, ("imp1", "impx", "imp2")))
+
+    # METHOD 1
+    parts.append("<h3>Metod 1: Agreement</h3>")
+    parts.append(f"<p>Av de {total_combos_after:,} enkelraderna som blev kvar efter filtreringen rankas dom efter:</p>")
+    parts.append(
+        "<ol>"
+        "<li>Hur många av enkelradens tecken som Isak, Ludde, och Fredde har med på sina kuponger</li>"
+        "<li>Om lika, hur säkra Isak, Ludde, och Fredde var (mer spikad & mindre garderad = mer säkra = rankas högre)</li>"
+        "<li>Om lika, störst sannolikhet enligt odds</li>"
+        "</ol>"
+    )
+    parts.append("<p>Dvs, denna metod bortser från sannolikheter, odds, och spelvärde och väljer bara för att det ska bli så jämnt som möjligt mellan Isak, Ludde, och Fredde.</p>")
+    parts.append(_stats_to_html(method1["stats"]))
+    parts.append("<p>Det resulterade i:</p>")
+    parts.append(_distribution_table_to_html(method1["distribution_df"]))
+    parts.append("<h4>Agreement</h4>")
+    parts.append(_agreement_table_to_html(method1["agreement_df"], method1.get("dropout_explanations")))
+    
+    # METHOD 2
+    parts.append("<h3>Metod 2: Förväntad utdelning</h3>")
+    parts.append(
+        f"<p>Av de {total_combos_after:,} enkelraderna som blev kvar efter filtreringen så räknades förväntade "
+        f"utdelningen ut för varje rad, givet att den får 13 rätt. Alla rader som förväntas ge mindre än "
+        f"{method2['min_payout']:,.0f} kr plockades bort. Då fanns {method2['remaining_count']:,} enkelrader kvar.</p>"
+    )
+    parts.append("<p>De enkelraderna rankades efter:</p>")
+    parts.append(
+        "<ol>"
+        "<li>Sannolikhet enligt den kombinerade sannolikheten mellan \"objektiva\" sannolikheter och sannolikheterna enligt Isak, Ludde och Freddes kuponger.</li>"
+        "</ol>"
+    )
+    parts.append(
+        f"<p>Dvs, denna metod tar hänsyn till sannolikheter givet oddsmarknaden och Isak, Ludde, och Freddes val "
+        f"för att maximera chansen på 13 rätt om 13 rätt ger &gt; {method2['min_payout']:,.0f} kr.</p>"
+    )
+    parts.append(_stats_to_html(method2["stats"]))
+    parts.append("<p>Det resulterade i:</p>")
+    parts.append(_distribution_table_to_html(method2["distribution_df"]))
+    parts.append("<h4>Agreement</h4>")
+    parts.append(_agreement_table_to_html(method2["agreement_df"], method2.get("dropout_explanations")))    
+    
+    
+    # METHOD 3
+    parts.append("<h3>Metod 3: Spelvärde</h3>")
+    parts.append(
+        f"<p>Av de {total_combos_after:,} enkelraderna som blev kvar efter filtreringen så räknades spelvärdet ut "
+        f"för varje rad som: Förväntad vinst = (sannolikhet för 13 rätt × förväntad vinst vid 13 rätt) − "
+        f"(sannolikhet för mindre än 13 rätt × förlora). Alla enkelrader som förväntas få 13 rätt mer sällan än "
+        f"{method3['min_probability']*100:.3f}% av gångerna plockades bort. Då fanns {method3['remaining_count']:,} enkelrader kvar.</p>"
+    )
+    parts.append("<p>De enkelraderna rankades efter den förväntade vinsten.</p>")
+    parts.append(
+        "<p>Dvs, denna metod tar hänsyn till sannolikheter givet oddsmarknaden och Isak, Ludde, och Freddes val "
+        "OCH spelvärde för att maximera chansen att vinna mycket pengar.</p>"
+    )
+    parts.append(_stats_to_html(method3["stats"]))
+    parts.append("<p>Det resulterade i:</p>")
+    parts.append(_distribution_table_to_html(method3["distribution_df"]))
+    parts.append("<h4>Agreement</h4>")
+    parts.append(_agreement_table_to_html(method3["agreement_df"], method3.get("dropout_explanations")))
+    
     parts.append("<hr>")
     parts.append("<p><strong>Txt-filer med enkelrader är bifogade.</strong></p>")
     parts.append("</body></html>")
@@ -224,3 +359,6 @@ def send_combined_results_email(recipient_emails, html_body, txt_attachments, su
     except Exception as e:
         print(f"[ERROR] Could not send email: {e}")
         return False
+
+
+

@@ -43,6 +43,75 @@ INTEGER_FEATURES = [
 AGGREGATE_FEATURES = ["total_odds", "total_svfolket", "sum_odds", "sum_svfolket"]
 
 
+FEATURE_LABELS = {
+    "n_home": "hemmasegrar (1:or)",
+    "n_draw": "kryss (X)",
+    "n_away": "bortasegrar (2:or)",
+    "draws_tight": "kryss i matcher med en svag favorit (högsta sannolikhet max 40%)",
+    "draws_clearfav": "kryss i matcher med en stark favorit (högsta sannolikhet minst 50%)",
+    "odds_1_1.5": "val med odds 1.0-1.5",
+    "odds_1.5_2": "val med odds 1.5-2.0",
+    "odds_2_2.5": "val med odds 2.0-2.5",
+    "odds_2.5_3": "val med odds 2.5-3.0",
+    "odds_3_4": "val med odds 3.0-4.0",
+    "odds_4_6": "val med odds 4.0-6.0",
+    "odds_6_plus": "val med odds över 6.0",
+    "svf_0_5": "val där Svenska Folket hade 0-5%",
+    "svf_5_10": "val där Svenska Folket hade 5-10%",
+    "svf_10_20": "val där Svenska Folket hade 10-20%",
+    "svf_20_30": "val där Svenska Folket hade 20-30%",
+    "svf_30_40": "val där Svenska Folket hade 30-40%",
+    "svf_40_50": "val där Svenska Folket hade 40-50%",
+    "svf_50_60": "val där Svenska Folket hade 50-60%",
+    "svf_60_70": "val där Svenska Folket hade 60-70%",
+    "svf_70_80": "val där Svenska Folket hade 70-80%",
+    "svf_80_90": "val där Svenska Folket hade 80-90%",
+    "svf_90_100": "val där Svenska Folket hade 90-100%",
+    "rank_odds_1": "val som är odds-favoriten",
+    "rank_odds_2": "val som är odds-tvåan",
+    "rank_odds_3": "val som är odds-trean",
+    "rank_svf_1": "val som är folkets favorit",
+    "rank_svf_2": "val som är folkets tvåa",
+    "rank_svf_3": "val som är folkets trea",
+    "total_odds": "radens totala odds (produkt av alla 13 matchers odds)",
+    "total_svfolket": "radens totala Svenska Folket-andel (produkt)",
+    "sum_odds": "radens totala odds (summa)",
+    "sum_svfolket": "radens totala Svenska Folket-andel (summa)",
+}
+
+
+def describe_applied_filters(thresholds, historical_features):
+    """
+    Builds human-readable descriptions of only the thresholds that were
+    actually tightened from the historical min/max (i.e. filters that had
+    a real effect), in the style "Tog bort alla rader med färre än X eller
+    fler än Y <label>".
+
+    Args:
+        thresholds: dict {feature_name: (lower, upper)} from get_historical_intervals
+        historical_features: DataFrame from build_historical_feature_matrix()
+
+    Returns:
+        list of str, one line per applied filter
+    """
+    lines = []
+    for feature, (lo, hi) in thresholds.items():
+        if feature not in historical_features.columns:
+            continue
+        global_min = historical_features[feature].min()
+        global_max = historical_features[feature].max()
+        if lo <= global_min and hi >= global_max:
+            continue
+        label = FEATURE_LABELS.get(feature, feature)
+        if feature in AGGREGATE_FEATURES:
+            lines.append(f"Tog bort alla rader där {label} låg utanför intervallet {lo:,.0f}-{hi:,.0f}")        
+        else:
+            lines.append(f"Tog bort alla rader med färre än {int(lo)} eller fler än {int(hi)} {label}")
+    return lines
+
+
+
+
 def parse_kupong(raw_input):
     """
     1. Splits a semicolon-separated kupong into 13 games
@@ -391,8 +460,8 @@ def get_historical_intervals(kupong_dir, reference_baseline_df, combo_features, 
     eliminated = _compute_eliminated(combo_features, thresholds)
     print(f"[RESULT] Final retention: {retention:.1%} | eliminated: {eliminated:.1%}")
 
-    return thresholds
-
+    return thresholds, historical_features
+    
 
 def filter_combinations_by_intervals(game_type, baseline_df, thresholds, out_dir=FILLED_DIR):
     """
