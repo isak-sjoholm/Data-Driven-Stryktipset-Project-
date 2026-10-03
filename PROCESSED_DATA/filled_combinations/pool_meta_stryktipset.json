@@ -1,16 +1,23 @@
 {
   "total_before": 1594323,
-  "total_after": 441147,
+  "total_after": 525916,
   "filter_descriptions": [
     "Tog bort alla rader med f\u00e4rre \u00e4n 1 eller fler \u00e4n 11 hemmasegrar (1:or)",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 5 kryss i matcher med en svag favorit (h\u00f6gsta sannolikhet max 40%)",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 6 val med odds 1.0-1.5",
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 8 val med odds 3.0-4.0",
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 4 val med odds 4.0-6.0",
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 2 val med odds \u00f6ver 6.0",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 5 val d\u00e4r Svenska Folket hade 10-20%",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 9 val d\u00e4r Svenska Folket hade 20-30%",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 9 val d\u00e4r Svenska Folket hade 30-40%",
+    "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 9 val d\u00e4r Svenska Folket hade 40-50%",
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 4 val d\u00e4r Svenska Folket hade 70-80%",
     "Tog bort alla rader med f\u00e4rre \u00e4n 1 eller fler \u00e4n 11 val som \u00e4r odds-favoriten",
-    "Tog bort alla rader d\u00e4r radens totala odds (produkt av alla 13 matchers odds) l\u00e5g utanf\u00f6r intervallet 1,274-731,586",
+    "Tog bort alla rader d\u00e4r radens totala odds (produkt av alla 13 matchers odds) l\u00e5g utanf\u00f6r intervallet 3,535-1,427,036",
     "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (produkt) l\u00e5g utanf\u00f6r intervallet 0-0",
-    "Tog bort alla rader d\u00e4r radens totala odds (summa) l\u00e5g utanf\u00f6r intervallet 24-44"
+    "Tog bort alla rader d\u00e4r radens totala odds (summa) l\u00e5g utanf\u00f6r intervallet 25-41",
+    "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (summa) l\u00e5g utanf\u00f6r intervallet 345-723"
   ],
-  "generated_at": "2026-10-03T09:46:16.785492"
+  "generated_at": "2026-10-03T14:42:48.492757"
 }
