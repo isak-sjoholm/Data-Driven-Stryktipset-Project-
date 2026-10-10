@@ -1,0 +1,31 @@
+name: Compute Expert Stats
+
+on:
+  schedule:
+    - cron: '17 6 * * 3'
+  workflow_dispatch:
+
+jobs:
+  compute-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Write service account key
+        run: echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > stryktipset-priors-automation-27f390beda4d.json
+
+      - name: Run compute_expert_stats
+        run: python -m AUTOMATION.compute_expert_stats
+
+      - name: Clean up secret file
+        if: always()
+        run: rm -f stryktipset-priors-automation-27f390beda4d.json
