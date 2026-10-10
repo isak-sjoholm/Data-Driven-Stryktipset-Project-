@@ -11,9 +11,9 @@
     "Tog bort alla rader med f\u00e4rre \u00e4n 0 eller fler \u00e4n 4 val d\u00e4r Svenska Folket hade 70-80%",
     "Tog bort alla rader med f\u00e4rre \u00e4n 1 eller fler \u00e4n 11 val som \u00e4r odds-favoriten",
     "Tog bort alla rader d\u00e4r radens totala odds (produkt av alla 13 matchers odds) l\u00e5g utanf\u00f6r intervallet 1,274-731,700",
-    "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (produkt) l\u00e5g utanf\u00f6r intervallet 0-0",
-    "Tog bort alla rader d\u00e4r radens totala odds (summa) l\u00e5g utanf\u00f6r intervallet 24-44",
+    "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (produkt) l\u00e5g utanf\u00f6r intervallet 9.32e-09-0.000358",
+    "Tog bort alla rader d\u00e4r radens totala odds (summa) l\u00e5g utanf\u00f6r intervallet 23.6-44.2",
     "Tog bort alla rader d\u00e4r radens totala Svenska Folket-andel (summa) l\u00e5g utanf\u00f6r intervallet 345-751"
   ],
-  "generated_at": "2026-10-10T07:54:16.223720"
+  "generated_at": "2026-10-10T10:18:01.515321"
 }
