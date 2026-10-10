@@ -198,7 +198,8 @@ def move_priors_to_historical(dry_run=False):
             print("[INFO] Exiting to avoid writing empty rows.")
             return False
 
-        ws_historical.append_rows(rows_to_add, value_input_option="USER_ENTERED")
+
+        ws_historical.append_rows(rows_to_add, value_input_option="USER_ENTERED", table_range="A1")
         print("[INFO] Data written to Historical Rounds")
 
         print(f"[INFO] Clearing '{CURRENT_TAB}'...")
