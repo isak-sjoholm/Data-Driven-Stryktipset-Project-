@@ -126,6 +126,9 @@ def move_priors_to_historical(dry_run=False):
         except Exception:
             df_current = pd.DataFrame(ws_current.get_all_records())
 
+        if not df_current.empty:
+            df_current = df_current[df_current["player_name"].astype(str).str.strip() != ""]
+
         if df_current.empty:
             print("[INFO] No data in Current Round to move.")
             print("[INFO] Current Round is already empty - nothing to do.")
@@ -135,7 +138,9 @@ def move_priors_to_historical(dry_run=False):
         print(f"[INFO] Experts: {df_current['player_name'].nunique()} unique")
         print()
 
-        df_current["moved_to_historical"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        stockholm_dates = pd.to_datetime(df_current["timestamp"], utc=True, format="ISO8601").dt.tz_convert("Europe/Stockholm").dt.tz_localize(None).dt.normalize()
+        df_current["Omgång"] = (stockholm_dates + pd.to_timedelta((5 - stockholm_dates.dt.weekday) % 7, unit="D")).dt.strftime("%Y-%m-%d")
+
 
         historical_headers_raw = ws_historical.row_values(1)
         historical_headers = [h for h in historical_headers_raw if h and str(h).strip()]
