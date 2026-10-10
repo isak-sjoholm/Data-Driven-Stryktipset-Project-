@@ -27,9 +27,10 @@ def expand_expert_to_rows(df_expert):
     all_choices = []
     for _, row in df_expert.iterrows():
         pick_str = str(row["pick"]) if pd.notna(row["pick"]) else ""
-        picks = [p.strip().upper() for p in pick_str.replace("x", "X").split(",") if p.strip()]
-        if not picks:
-            picks = [""]
+
+
+        picks = sorted(_normalize_pick_symbols(pick_str)) or [""]
+
         all_choices.append(picks)
 
     combinations = list(itertools.product(*all_choices))
