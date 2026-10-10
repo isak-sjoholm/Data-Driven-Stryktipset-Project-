@@ -79,6 +79,10 @@ FEATURE_LABELS = {
     "sum_svfolket": "radens totala Svenska Folket-andel (summa)",
 }
 
+def _format_bound(value):
+    """Formats a threshold: integers with thousands separators for large values, 3 significant digits otherwise."""
+    return f"{value:,.0f}" if abs(value) >= 100 else f"{value:.3g}"
+
 
 def describe_applied_filters(thresholds, historical_features):
     """
@@ -104,7 +108,7 @@ def describe_applied_filters(thresholds, historical_features):
             continue
         label = FEATURE_LABELS.get(feature, feature)
         if feature in AGGREGATE_FEATURES:
-            lines.append(f"Tog bort alla rader där {label} låg utanför intervallet {lo:,.0f}-{hi:,.0f}")        
+            lines.append(f"Tog bort alla rader där {label} låg utanför intervallet {_format_bound(lo)}-{_format_bound(hi)}")
         else:
             lines.append(f"Tog bort alla rader med färre än {int(lo)} eller fler än {int(hi)} {label}")
     return lines
