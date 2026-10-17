@@ -503,7 +503,7 @@ def compute_expert_dropout_breakdown(
             explanations[name] = (
                 f"{pct_hist_dropped}% av raderna föll bort för att de ansågs helt osannolika att ge 13 rätt enligt historiska filter. "
                 f"{pct_secondary_dropped}% av raderna föll bort för att de hade gett mindre än 10 000 kr vid 13 rätt. "
-                f"{pct_rank_dropped}% av raderna föll bort för att de inte var bland topp 300 mest sannolika."
+                f"{pct_rank_dropped}% av raderna föll bort för att de inte var bland topp 400 mest sannolika."
             )
 
         elif method_number == 3:
