@@ -44,7 +44,7 @@ from ANALYSIS.baseline_analysis import (
 )
 from EMAIL.email_sender import build_email_html, send_combined_results_email
 
-TOP_N = 300
+TOP_N = 400
 MIN_PAYOUT = 10000.0
 MIN_PROBABILITY = 0.00002
 
