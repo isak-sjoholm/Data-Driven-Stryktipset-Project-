@@ -27,6 +27,16 @@ v = st.session_state.get("v", 0)
 
 st.title("Stryktipset")
 
+st.markdown(
+    """
+    <style>
+    [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 0.5rem !important; }
+    [data-testid="stColumn"], [data-testid="column"] { min-width: 0 !important; width: auto !important; flex: 1 1 0 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 if "klar" in st.session_state:
     st.success(st.session_state.pop("klar"))
 
