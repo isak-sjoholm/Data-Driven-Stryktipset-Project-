@@ -4,4 +4,3 @@ gspread
 google-auth
 altair
 jinja2
-matplotlib

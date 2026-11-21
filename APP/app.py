@@ -5,7 +5,6 @@ import pandas as pd
 import altair as alt
 import gspread
 from google.oauth2.service_account import Credentials
-from matplotlib.colors import LinearSegmentedColormap
 
 SERVICE_ACCOUNT_FILE = "stryktipset-priors-automation-27f390beda4d.json"
 SHEET_ID = "1O7dHCXAblAGXLAzOKYQ93hr7DTkFUv7iqEg2aUkaidY"
@@ -138,9 +137,13 @@ else:
     st.subheader("Skräll-index")
     skrall_stil = skrall.style
     for kol in ["Skräll-index", "Värdebaserat skräll-index"]:
-        mitt = (skrall[kol].median() - skrall[kol].min()) / (skrall[kol].max() - skrall[kol].min() + 1e-9)
-        skrall_stil = skrall_stil.background_gradient(
-            cmap=LinearSegmentedColormap.from_list("skrall", [(0, "#E28787"), (mitt, "#F4F48C"), (1, "#A0E883")]),
+        mx = max(skrall[kol].max(), 1e-9)
+        skrall_stil = skrall_stil.apply(
+            lambda s, mx=mx: [
+                "background-color: #E28787; color: black" if x < 0
+                else f"background-color: rgb({244 - 84 * x / mx:.0f}, {244 - 12 * x / mx:.0f}, {140 - 9 * x / mx:.0f}); color: black"
+                for x in s
+            ],
             subset=[kol],
         )
     st.dataframe(skrall_stil.format("{:.1f}", subset=["Skräll-index", "Värdebaserat skräll-index"]), hide_index=True, use_container_width=True)
