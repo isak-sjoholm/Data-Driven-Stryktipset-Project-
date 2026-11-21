@@ -1,8 +1,6 @@
 name: Send Reminder
 
 on:
-  schedule:
-    - cron: '15 10 * * 6'
   workflow_dispatch:
 
 jobs:

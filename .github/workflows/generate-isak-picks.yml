@@ -1,8 +1,6 @@
 name: Generate Isak Picks
 
 on:
-  schedule:
-    - cron: '3 11 * * 6'
   workflow_dispatch:
 
 jobs:

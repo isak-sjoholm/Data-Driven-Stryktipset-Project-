@@ -1,8 +1,6 @@
 name: Prepare Pool
 
 on:
-  schedule:
-    - cron: '17 9 * * 6'
 
   workflow_dispatch:
 
