@@ -32,6 +32,7 @@ st.markdown(
     <style>
     [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 0.5rem !important; }
     [data-testid="stColumn"], [data-testid="column"] { min-width: 0 !important; width: auto !important; flex: 1 1 0 !important; }
+    .stButton button { height: 3.5rem; font-size: 1.3rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -135,7 +136,8 @@ else:
         column_config={c: st.column_config.NumberColumn(format="%.1f") for c in ["Skräll-index", "Värdebaserat skräll-index"]},
     )
 
-    if st.button("Submit Selections", type="primary"):
+    _, mitt, _ = st.columns([1, 3, 1])
+    if mitt.button("Skicka in din kupong", type="primary", use_container_width=True):
         if not namn.strip():
             st.error("Please enter your name before submitting.")
         elif (kryss.sum(axis=1) == 0).any():
