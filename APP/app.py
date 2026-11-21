@@ -5,6 +5,7 @@ import pandas as pd
 import altair as alt
 import gspread
 from google.oauth2.service_account import Credentials
+from matplotlib.colors import LinearSegmentedColormap
 
 SERVICE_ACCOUNT_FILE = "stryktipset-priors-automation-27f390beda4d.json"
 SHEET_ID = "1O7dHCXAblAGXLAzOKYQ93hr7DTkFUv7iqEg2aUkaidY"
@@ -21,7 +22,12 @@ except Exception:
         scopes=["https://www.googleapis.com/auth/spreadsheets"],
     )
 
-sh = gspread.authorize(creds).open_by_key(SHEET_ID)
+if "sh" not in st.session_state:
+    st.session_state["sh"] = gspread.authorize(creds).open_by_key(SHEET_ID)
+    st.session_state["cr"] = st.session_state["sh"].worksheet("Current Round").get_all_values()
+    st.session_state["stats"] = st.session_state["sh"].worksheet("Stats").get_all_values()
+    st.session_state["rounds"] = st.session_state["sh"].worksheet("Stats Rounds").get_all_values()
+sh = st.session_state["sh"]
 
 v = st.session_state.get("v", 0)
 
@@ -46,7 +52,8 @@ namn = st.text_input("Your Name (Required)", key=f"namn_{v}")
 
 st.subheader("Matcher")
 
-values = sh.worksheet("Current Round").get_all_values()
+values = st.session_state["cr"]
+
 kupong_kol = [h.strip().lower() for h in values[0]].index("kupong_raw_stryktipset")
 celler = [rad[kupong_kol] for rad in values[1:] if len(rad) > kupong_kol and rad[kupong_kol].strip() != ""]
 
@@ -129,12 +136,14 @@ else:
             p.caption(texter[(n, bool(kryss.loc[i, op.loc[i].idxmax()]), val >= 0)])
 
     st.subheader("Skräll-index")
-    st.dataframe(
-        skrall,
-        hide_index=True,
-        use_container_width=True,
-        column_config={c: st.column_config.NumberColumn(format="%.1f") for c in ["Skräll-index", "Värdebaserat skräll-index"]},
-    )
+    skrall_stil = skrall.style
+    for kol in ["Skräll-index", "Värdebaserat skräll-index"]:
+        mitt = (skrall[kol].median() - skrall[kol].min()) / (skrall[kol].max() - skrall[kol].min() + 1e-9)
+        skrall_stil = skrall_stil.background_gradient(
+            cmap=LinearSegmentedColormap.from_list("skrall", [(0, "#E28787"), (mitt, "#F4F48C"), (1, "#A0E883")]),
+            subset=[kol],
+        )
+    st.dataframe(skrall_stil.format("{:.1f}", subset=["Skräll-index", "Värdebaserat skräll-index"]), hide_index=True, use_container_width=True)
 
     _, mitt, _ = st.columns([1, 3, 1])
     if mitt.button("Skicka in din kupong", type="primary", use_container_width=True):
@@ -163,7 +172,8 @@ else:
 
 st.subheader("Historik")
 
-values = sh.worksheet("Stats").get_all_values()
+values = st.session_state["stats"]
+
 stats = pd.DataFrame(values[1:], columns=values[0])
 for col in stats.columns[1:]:
     stats[col] = pd.to_numeric(stats[col].str.replace("−", "-").str.replace(",", "."))
@@ -185,7 +195,8 @@ st.dataframe(
     hide_index=True,
 )
 
-values = sh.worksheet("Stats Rounds").get_all_values()
+values = st.session_state["rounds"]
+
 rounds = pd.DataFrame(values[1:], columns=values[0])
 rounds = rounds[rounds["Omgång"] != ""]
 rounds["Omgång"] = pd.to_datetime(rounds["Omgång"])
