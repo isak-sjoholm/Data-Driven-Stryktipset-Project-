@@ -10,10 +10,17 @@ SERVICE_ACCOUNT_FILE = "stryktipset-priors-automation-27f390beda4d.json"
 SHEET_ID = "1O7dHCXAblAGXLAzOKYQ93hr7DTkFUv7iqEg2aUkaidY"
 SKRIV_FLIK = "Current Round"
 
-creds = Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE,
-    scopes=["https://www.googleapis.com/auth/spreadsheets"],
-)
+try:
+    creds = Credentials.from_service_account_info(
+        dict(st.secrets["gcp_service_account"]),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
+except Exception:
+    creds = Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
+
 sh = gspread.authorize(creds).open_by_key(SHEET_ID)
 
 v = st.session_state.get("v", 0)
