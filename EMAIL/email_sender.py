@@ -490,7 +490,7 @@ def send_reminder_email(recipient_emails, config_file=None):
                 <p class="text">Det är dags att fylla i din Stryktipset-kupong för denna vecka.</p>
 
                 <div class="button-container">
-                    <a href="https://striktips-prior-probes.lovable.app" class="button">
+                    <a href="https://isak-stryktipset-kupong-input.streamlit.app" class="button">
                         Fyll i din kupong här
                     </a>
                 </div>
